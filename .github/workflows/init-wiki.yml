@@ -1,0 +1,51 @@
+name: Initialize Wiki
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  init-wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Initialize wiki with Home page
+        run: |
+          WIKI_DIR=$(mktemp -d)
+          cd "$WIKI_DIR"
+          git init
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+
+          cat > Home.md << 'EOF'
+          # Welcome to the LifeHacks Wiki
+
+          Welcome! This wiki contains Przemy's life hacks, life organization, notes, diagrams, and mind maps.
+
+          ---
+
+          ## Sections
+
+          ### Administration / Finance
+
+          ### Health
+
+          ### Family
+
+          ### Science
+
+          ### Work
+          EOF
+
+          git add Home.md
+          git commit -m "Initialize wiki with Home page and section placeholders"
+
+          WIKI_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git"
+
+          # Only push if the wiki is empty (no existing commits)
+          if git ls-remote --exit-code "$WIKI_URL" HEAD > /dev/null 2>&1; then
+            echo "Wiki already exists and has content. Skipping initialization."
+          else
+            git push "$WIKI_URL" HEAD:main
+          fi
