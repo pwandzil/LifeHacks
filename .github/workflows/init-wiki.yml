@@ -12,11 +12,32 @@ jobs:
     steps:
       - name: Initialize wiki with Home page
         run: |
+          WIKI_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git"
           WIKI_DIR=$(mktemp -d)
           cd "$WIKI_DIR"
-          git init -b main
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git config user.name "github-actions[bot]"
+
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
+          # Check if the wiki already has content
+          if git ls-remote "$WIKI_URL" HEAD 2>/dev/null | grep -q .; then
+            # Clone the existing wiki to inspect its content
+            git clone "$WIKI_URL" .
+
+            # Allow overwrite only if wiki has exactly one file containing the default GitHub welcome page
+            FILE_COUNT=$(git ls-files | wc -l | awk '{print $1}')
+            HOME_CONTENT=$(cat Home.md 2>/dev/null || echo "")
+
+            if [ "$FILE_COUNT" -eq 1 ] && echo "$HOME_CONTENT" | grep -qi "^Welcome to the.*wiki!"; then
+              echo "Wiki contains only the default home page. Overwriting with structured content."
+            else
+              echo "Wiki already has custom content. Skipping initialization."
+              exit 0
+            fi
+          else
+            # Wiki does not exist yet; create a fresh repository
+            git init -b main
+          fi
 
           cat > Home.md << 'EOF'
           # Welcome to the LifeHacks Wiki
@@ -41,16 +62,9 @@ jobs:
           git add Home.md
           git commit -m "Initialize wiki with Home page and section placeholders"
 
-          WIKI_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git"
-
-          # Only push if the wiki is empty (no existing commits)
-          if git ls-remote "$WIKI_URL" HEAD 2>/dev/null | grep -q .; then
-            echo "Wiki already exists and has content. Skipping initialization."
+          if git push "$WIKI_URL" HEAD:main; then
+            echo "Wiki initialized successfully."
           else
-            if git push "$WIKI_URL" HEAD:main; then
-              echo "Wiki initialized successfully."
-            else
-              echo "::warning::Failed to push to wiki. Please ensure the wiki feature is enabled in repository Settings > Features > Wiki, then re-run this workflow."
-              exit 1
-            fi
+            echo "::warning::Failed to push to wiki. Please ensure the wiki feature is enabled in repository Settings > Features > Wiki, then re-run this workflow."
+            exit 1
           fi
