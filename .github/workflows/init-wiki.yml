@@ -14,7 +14,7 @@ jobs:
         run: |
           WIKI_DIR=$(mktemp -d)
           cd "$WIKI_DIR"
-          git init
+          git init -b main
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
 
@@ -44,8 +44,13 @@ jobs:
           WIKI_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git"
 
           # Only push if the wiki is empty (no existing commits)
-          if git ls-remote --exit-code "$WIKI_URL" HEAD > /dev/null 2>&1; then
+          if git ls-remote "$WIKI_URL" HEAD 2>/dev/null | grep -q .; then
             echo "Wiki already exists and has content. Skipping initialization."
           else
-            git push "$WIKI_URL" HEAD:main
+            if git push "$WIKI_URL" HEAD:main; then
+              echo "Wiki initialized successfully."
+            else
+              echo "::warning::Failed to push to wiki. Please ensure the wiki feature is enabled in repository Settings > Features > Wiki, then re-run this workflow."
+              exit 1
+            fi
           fi
